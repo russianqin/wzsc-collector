@@ -1,14 +1,9 @@
 {
-  "repoPath": "C:\\\\Users\\\\your-name\\\\Desktop\\\\my-clippings",
+  "repoPath": "C:\\Users\\你的用户名\\Desktop\\WenZhangShouCang",
   "assetsDirName": "assets",
-  "images": "download",
+  "images": "keep-remote",
   "includeComments": true,
   "commentFilter": "author",
   "video": "poster",
-  "browserChannel": "msedge",
-  "userDataDir": ".browser-profile",
-  "headless": false,
-  "delaySeconds": [5, 12],
-  "maxComments": 50,
-  "filenameTemplate": "{num}.{title}"
+  "maxComments": 50
 }

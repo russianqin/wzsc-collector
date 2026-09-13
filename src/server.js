@@ -2,8 +2,14 @@
 'use strict';
 
 /**
- * 本机服务：接收浏览器扩展发来的文章数据，下载图片、写出 Markdown。
- * 用法：node src/server.js   （或双击项目里的「启动收藏服务.cmd」）
+ * 本机服务：接收浏览器扩展发来的文章，写成 Markdown 存进收藏仓库。
+ *
+ * 它是"按需启动、用完就下班"的：
+ *   · 你在扩展里点一下 → 浏览器通过原生消息把小助手 bin\wzsc-host.exe 拉起来
+ *     → 小助手再把本服务在后台启动（全程没有窗口）
+ *   · 之后一直没请求 → 闲置几分钟后自己退出，机器上不留任何东西
+ *
+ * 手动检查：node src/server.js --check
  */
 
 const http = require('http');
@@ -12,7 +18,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const { loadConfig } = require('./config');
-const { filterComments } = require('./sites');
+const { applyPastedComments } = require('./paste');
 const {
   htmlToMarkdown,
   rewriteImages,
@@ -26,9 +32,11 @@ const { log, sanitizeFilename, nextSerial, guessExt } = require('./util');
 const BASE_PORT = Number(process.env.WZSC_PORT || 8765);
 const MAX_PORT_TRIES = 4;
 // 服务版本：扩展会检查它，太旧的服务会被跳过（避免连到别的东西上）
-const SERVICE_VERSION = '0.2.5';
+const SERVICE_VERSION = '0.3.0';
 const MAX_BODY = 30 * 1024 * 1024; // 30MB
 const config = loadConfig();
+// 最近一次收到请求的时间（用来判断"闲置多久了"）
+let lastActivity = Date.now();
 
 const BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
@@ -60,9 +68,19 @@ async function downloadImage(url, destDir, index) {
   }
 }
 
+/** 只保留"精选"或"与作者有互动"的评论；都分不清时就退回前 N 条 */
+function filterComments(comments, conf) {
+  if (!comments || comments.length === 0) return [];
+  if (conf.commentFilter === 'none') return [];
+  if (conf.commentFilter === 'all') return comments.slice(0, conf.maxComments);
+  const curated = comments.filter((comment) => comment.author || comment.likes);
+  if (curated.length > 0) return curated.slice(0, conf.maxComments);
+  return comments.slice(0, Math.min(10, conf.maxComments));
+}
+
 async function saveArticle(payload) {
   if (!fs.existsSync(config.repoPath)) {
-    throw new Error('仓库路径不存在：' + config.repoPath + '（请检查 config.json）');
+    throw new Error('收藏仓库路径不存在：' + config.repoPath + '（请检查 config.json 里的 repoPath）');
   }
 
   const serial = nextSerial(config.repoPath);
@@ -82,7 +100,6 @@ async function saveArticle(payload) {
           title: payload.title || '',
           url: payload.canonical || payload.pageUrl || '',
           contentHtmlChars: (payload.contentHtml || '').length,
-          debugContentChars: (payload.debugContentHtml || '').length,
           comments: (payload.comments || []).length,
           hasDebugHtml: Boolean(payload.debugHtml)
         },
@@ -95,22 +112,21 @@ async function saveArticle(payload) {
     log('写保存记录失败：' + error.message);
   }
 
-  // 调试页面（扩展里勾选"同时保存调试页面"时会有）
+  // 调试页面（在扩展里勾选"同时保存调试页面"时才会有）
   if (payload.debugHtml) {
     try {
       const debugFile = path.join(debugDir, `${payload.siteId || 'page'}-${Date.now()}.html`);
       fs.writeFileSync(debugFile, payload.debugHtml, 'utf8');
       log(`已保存调试页面：${debugFile}`);
-      // 提取到的正文 HTML（最关键：用它来排查排版问题）
       if (payload.debugContentHtml) {
         const contentFile = path.join(debugDir, `${payload.siteId || 'page'}-content-${Date.now()}.html`);
         fs.writeFileSync(contentFile, payload.debugContentHtml, 'utf8');
-        log(`已保存正文 HTML：${contentFile}`);
       }
     } catch (error) {
       log('保存调试页面失败：' + error.message);
     }
   }
+
   const assetDir = path.join(config.repoPath, config.assetsDirName, serial);
   const relAsset = `${config.assetsDirName}/${serial}`;
   const cache = new Map();
@@ -188,6 +204,7 @@ function readBody(req) {
 }
 
 const handler = async (req, res) => {
+  lastActivity = Date.now();
   const send = (code, data) => {
     res.writeHead(code, {
       'Content-Type': 'application/json; charset=utf-8',
@@ -212,6 +229,17 @@ const handler = async (req, res) => {
       return send(500, { ok: false, error: error.message });
     }
   }
+  if (req.method === 'POST' && req.url.startsWith('/paste-comments')) {
+    try {
+      const payload = JSON.parse(await readBody(req));
+      const result = applyPastedComments(config.repoPath, payload.number, payload.text || '');
+      log(`已补录留言：${result.file}（${result.count} 条${result.replaced ? '，替换原有留言' : ''}）`);
+      return send(200, Object.assign({ ok: true }, result));
+    } catch (error) {
+      log('补录留言失败：' + error.message);
+      return send(500, { ok: false, error: error.message });
+    }
+  }
   if (req.method === 'POST' && req.url.startsWith('/open-repo')) {
     try {
       spawn('explorer.exe', [config.repoPath], { detached: true, stdio: 'ignore' }).unref();
@@ -219,6 +247,12 @@ const handler = async (req, res) => {
     } catch (error) {
       return send(500, { ok: false, error: error.message });
     }
+  }
+  // 让服务体面地退出（取消安装、或者想立刻腾出端口时用）
+  if (req.method === 'POST' && req.url.startsWith('/shutdown')) {
+    send(200, { ok: true, bye: true });
+    setTimeout(() => process.exit(0), 200);
+    return undefined;
   }
   return send(404, { ok: false, error: 'not found' });
 };
@@ -235,22 +269,83 @@ function listen(port, left) {
       }
       reject(error);
     });
-    server.listen(port, '127.0.0.1', () => resolve({ server, port }));
+    server.listen(port, '127.0.0.1', () => resolve(server));
   });
 }
 
-listen(BASE_PORT, MAX_PORT_TRIES)
-  .then(({ server, port }) => {
-    log(`收藏服务已启动：http://127.0.0.1:${port}`);
-    log(`服务版本：${SERVICE_VERSION}`);
-    log(`收藏仓库：${config.repoPath}`);
-    log('保持这个窗口开着（关掉窗口 = 服务停止）。保存时看这里的日志。');
-    // 自检模式：node src/server.js --check —— 只验证端口和配置，然后立刻退出
-    if (process.argv.includes('--check')) {
-      server.close(() => process.exit(0));
+async function checkAndReport() {
+  log(`收藏仓库：${config.repoPath}`);
+  log(`服务版本：${SERVICE_VERSION}`);
+  log(`图片设置：${config.images}${config.images === 'keep-remote' ? '（只保留外链，不下载）' : '（下载到仓库）'}`);
+  log(`闲置多久自动退出：${Math.round(IDLE_EXIT_MS / 60000)} 分钟`);
+  const port = await findRunningService();
+  log(`现在有服务在跑吗：${port ? '有（端口 ' + port + '）' : '没有'}`);
+}
+
+/** 看看这几个端口上是不是已经有"够新"的服务在跑 */
+function findRunningService() {
+  return new Promise((resolve) => {
+    let left = 4;
+    let found = null;
+    for (let port = BASE_PORT; port < BASE_PORT + 4; port += 1) {
+      const request = http.get({ host: '127.0.0.1', port: port, path: '/health', timeout: 500 }, (response) => {
+        let body = '';
+        response.on('data', (chunk) => {
+          body += chunk;
+        });
+        response.on('end', () => {
+          try {
+            const data = JSON.parse(body);
+            if (data && data.ok && String(data.version) >= SERVICE_VERSION) found = port;
+          } catch (error) {
+            /* 不是我们的服务 */
+          }
+          left -= 1;
+          if (left === 0) resolve(found);
+        });
+      });
+      request.on('timeout', () => request.destroy());
+      request.on('error', () => {
+        left -= 1;
+        if (left === 0) resolve(found);
+      });
     }
-  })
-  .catch((error) => {
-    log('服务启动失败：' + error.message);
-    process.exit(1);
   });
+}
+
+// 多久没请求就自己退出（默认 5 分钟）
+const IDLE_EXIT_MS = Number(process.env.WZSC_IDLE_MS || 5 * 60 * 1000);
+
+/** 按需启动：一起来就监听；闲置一会儿自己下班 */
+async function main() {
+  if (process.argv.includes('--check')) {
+    await checkAndReport();
+    return;
+  }
+
+  log(`收藏服务启动：${config.repoPath}`);
+  log(`服务版本：${SERVICE_VERSION}（按需启动，闲置 ${Math.round(IDLE_EXIT_MS / 60000)} 分钟后自动退出）`);
+
+  try {
+    await listen(BASE_PORT, MAX_PORT_TRIES);
+  } catch (error) {
+    log('启动失败（端口都被占了？）：' + error.message);
+    process.exit(1);
+  }
+
+  // 检查节奏：最长 30 秒一次，闲置时间短的时候跟着变快（方便自测）
+  const tickMs = Math.max(1000, Math.min(30000, Math.round(IDLE_EXIT_MS / 4)));
+  const idleTimer = setInterval(() => {
+    const idleFor = Date.now() - lastActivity;
+    if (idleFor > IDLE_EXIT_MS) {
+      log('好久没接到请求，服务先下班了（下次用扩展会自动再起来）。');
+      process.exit(0);
+    }
+  }, tickMs);
+  idleTimer.unref();
+}
+
+main().catch((error) => {
+  console.error('运行失败：', error.message);
+  process.exit(1);
+});

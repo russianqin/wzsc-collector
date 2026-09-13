@@ -2,5 +2,8 @@ node_modules/
 .browser-profile/
 config.json
 debug/
+node-path.txt
+stop.txt
+bin/
 *.log
 .DS_Store

@@ -1,19 +1,14 @@
 {
   "name": "wzsc-collector",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "把网页文章（微信公众号 / 知乎 / 微博 / X / 通用网页）采集为 Markdown，存进个人收藏仓库",
   "license": "MIT",
   "type": "commonjs",
-  "bin": {
-    "wzsc-collect": "src/cli.js"
-  },
   "scripts": {
-    "start": "node src/cli.js",
-    "login": "node src/cli.js --login",
-    "paste": "node src/paste-comments.js"
+    "start": "node src/server.js",
+    "install-addon": "node install.js"
   },
   "dependencies": {
-    "playwright-core": "^1.47.0",
     "turndown": "^7.2.0",
     "turndown-plugin-gfm": "^1.0.2"
   },

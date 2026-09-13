@@ -1,2 +1,6 @@
-# Auto detect text files and perform LF normalization
+# 默认按文本处理，仓库里统一用 LF
 * text=auto
+
+# Windows 的批处理和脚本必须用 CRLF，否则双击可能出问题
+*.cmd text eol=crlf
+*.vbs text eol=crlf

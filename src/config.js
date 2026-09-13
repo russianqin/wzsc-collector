@@ -8,29 +8,23 @@ const ROOT = path.resolve(__dirname, '..');
 const DEFAULTS = {
   repoPath: '.',
   assetsDirName: 'assets',
-  images: 'download',
+  images: 'keep-remote',
   includeComments: true,
   commentFilter: 'author',
   video: 'poster',
-  browserChannel: 'msedge',
-  userDataDir: '.browser-profile',
-  headless: false,
-  delaySeconds: [5, 12],
-  maxComments: 50,
-  filenameTemplate: '{num}.{title}'
+  maxComments: 50
 };
 
 function loadConfig(explicitPath) {
   const candidates = [explicitPath, path.join(ROOT, 'config.json'), path.join(ROOT, 'config.example.json')].filter(Boolean);
   const file = candidates.find((candidate) => fs.existsSync(candidate));
   if (!file) {
-    throw new Error('找不到配置文件，请先复制 config.example.json 为 config.json');
+    throw new Error('找不到配置文件，请把 config.example.json 复制成 config.json 并填好 repoPath');
   }
-  const config = { ...DEFAULTS, ...JSON.parse(fs.readFileSync(file, 'utf8')) };
+  const config = Object.assign({}, DEFAULTS, JSON.parse(fs.readFileSync(file, 'utf8')));
   config.configFile = file;
   config.repoPath = path.resolve(config.repoPath);
-  config.userDataDir = path.resolve(ROOT, config.userDataDir);
-  // 允许临时指定仓库（调试/多仓库时用）
+  // 允许临时指定仓库（测试时用）
   if (process.env.WZSC_REPO) config.repoPath = path.resolve(process.env.WZSC_REPO);
   return config;
 }

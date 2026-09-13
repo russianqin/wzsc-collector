@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
   "name": "文章收藏助手 (wzsc-collector)",
-  "version": "0.1.10",
+  "version": "0.3.0",
   "description": "把当前网页保存成 Markdown 存进你的收藏仓库（知乎 / 微信公众号 / 微博 / X / 通用网页）",
-  "permissions": ["activeTab", "scripting"],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmpy1o8Po1GoGc+SsfY2l83h7z5cqZByBsBWrbzjCxcu787cZRHcf7MgwSuaosj6zlVSLJK/DO1IxffkACXk5cQYDke4rxCGb3WGrM3RzcMHlbxGxmkiqg3LUJH+tnrtw73WIaMUpfTfICYnSOM8kJKCGX+gC0AVaeB/Y+8VpgL4+wRl+LjozhuwtfRR5m2644aYY4KId7mb9yH4SB8d5WXAUpKXipVKBHM5bwHU/xPWPqLwz16FfDNOhLTbDRh5kHEIm1begiJY2OJ9m2NuMDh3DnxchWN/i4ofH5hnwve2lca+eH6oD0paA8I9fy7ddfUjPczPjrHFqPwHbUZ3mLwIDAQAB",
+  "permissions": ["activeTab", "scripting", "nativeMessaging"],
   "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
   "action": {
     "default_popup": "popup.html",
