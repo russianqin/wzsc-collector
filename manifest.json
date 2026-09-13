@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "文章收藏助手 (wzsc-collector)",
+  "version": "0.1.10",
+  "description": "把当前网页保存成 Markdown 存进你的收藏仓库（知乎 / 微信公众号 / 微博 / X / 通用网页）",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "保存这篇文章到收藏仓库"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["src/extractors.js", "src/prepare-dom.js", "src/content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}

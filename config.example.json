@@ -1,0 +1,14 @@
+{
+  "repoPath": "C:\\\\Users\\\\your-name\\\\Desktop\\\\my-clippings",
+  "assetsDirName": "assets",
+  "images": "download",
+  "includeComments": true,
+  "commentFilter": "author",
+  "video": "poster",
+  "browserChannel": "msedge",
+  "userDataDir": ".browser-profile",
+  "headless": false,
+  "delaySeconds": [5, 12],
+  "maxComments": 50,
+  "filenameTemplate": "{num}.{title}"
+}
