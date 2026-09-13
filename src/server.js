@@ -4,10 +4,11 @@
 /**
  * 本机服务：接收浏览器扩展发来的文章，写成 Markdown 存进收藏仓库。
  *
- * 它是"按需启动、用完就下班"的：
- *   · 你在扩展里点一下 → 浏览器通过原生消息把小助手 bin\wzsc-host.exe 拉起来
- *     → 小助手再把本服务在后台启动（全程没有窗口）
- *   · 之后一直没请求 → 闲置几分钟后自己退出，机器上不留任何东西
+ * 它平时跟着浏览器待命（点扩展秒开）：
+ *   · 浏览器开着 → 开机启动的看门狗「启动收藏助手.vbs」保证本服务在后台跑着
+ *   · 浏览器全关一会儿 → 本服务自己退出，机器上不留东西
+ *   · 万一服务没在跑（比如刚开机、看门狗还没到位）→ 扩展会通过原生消息
+ *     让小助手 bin\wzsc-host.exe 立刻把它拉起来，所以第一次点也不会卡住
  *
  * 手动检查：node src/server.js --check
  */
@@ -18,6 +19,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const { loadConfig } = require('./config');
+const { browserRunning } = require('./browser-check');
 const { applyPastedComments } = require('./paste');
 const {
   htmlToMarkdown,
@@ -35,8 +37,6 @@ const MAX_PORT_TRIES = 4;
 const SERVICE_VERSION = '0.3.0';
 const MAX_BODY = 30 * 1024 * 1024; // 30MB
 const config = loadConfig();
-// 最近一次收到请求的时间（用来判断"闲置多久了"）
-let lastActivity = Date.now();
 
 const BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
@@ -204,7 +204,6 @@ function readBody(req) {
 }
 
 const handler = async (req, res) => {
-  lastActivity = Date.now();
   const send = (code, data) => {
     res.writeHead(code, {
       'Content-Type': 'application/json; charset=utf-8',
@@ -277,7 +276,7 @@ async function checkAndReport() {
   log(`收藏仓库：${config.repoPath}`);
   log(`服务版本：${SERVICE_VERSION}`);
   log(`图片设置：${config.images}${config.images === 'keep-remote' ? '（只保留外链，不下载）' : '（下载到仓库）'}`);
-  log(`闲置多久自动退出：${Math.round(IDLE_EXIT_MS / 60000)} 分钟`);
+  log(`浏览器在运行吗：${(await browserRunning()) ? '是' : '否'}`);
   const port = await findRunningService();
   log(`现在有服务在跑吗：${port ? '有（端口 ' + port + '）' : '没有'}`);
 }
@@ -313,10 +312,10 @@ function findRunningService() {
   });
 }
 
-// 多久没请求就自己退出（默认 5 分钟）
-const IDLE_EXIT_MS = Number(process.env.WZSC_IDLE_MS || 5 * 60 * 1000);
+// 浏览器全关之后，再等多久就下班（默认 3 分钟）
+const BROWSER_GONE_EXIT_MS = Number(process.env.WZSC_BROWSER_IDLE_MS || 3 * 60 * 1000);
 
-/** 按需启动：一起来就监听；闲置一会儿自己下班 */
+/** 跟着浏览器走：一起来就监听；浏览器全关一会儿就下班 */
 async function main() {
   if (process.argv.includes('--check')) {
     await checkAndReport();
@@ -324,7 +323,14 @@ async function main() {
   }
 
   log(`收藏服务启动：${config.repoPath}`);
-  log(`服务版本：${SERVICE_VERSION}（按需启动，闲置 ${Math.round(IDLE_EXIT_MS / 60000)} 分钟后自动退出）`);
+  log(`服务版本：${SERVICE_VERSION}（跟着浏览器，浏览器全关 ${Math.round(BROWSER_GONE_EXIT_MS / 60000)} 分钟后退出）`);
+
+  // 已经有一个够新的服务在跑就不用再起（避免看门狗和扩展同时唤醒时起两个）
+  const already = await findRunningService();
+  if (already) {
+    log(`已经有服务在跑（端口 ${already}），这个实例退出。`);
+    return;
+  }
 
   try {
     await listen(BASE_PORT, MAX_PORT_TRIES);
@@ -333,16 +339,19 @@ async function main() {
     process.exit(1);
   }
 
-  // 检查节奏：最长 30 秒一次，闲置时间短的时候跟着变快（方便自测）
-  const tickMs = Math.max(1000, Math.min(30000, Math.round(IDLE_EXIT_MS / 4)));
-  const idleTimer = setInterval(() => {
-    const idleFor = Date.now() - lastActivity;
-    if (idleFor > IDLE_EXIT_MS) {
-      log('好久没接到请求，服务先下班了（下次用扩展会自动再起来）。');
+  let lastBrowserSeen = Date.now();
+  const tickMs = Math.max(1000, Math.min(10000, Math.round(BROWSER_GONE_EXIT_MS / 4)));
+  const watchTimer = setInterval(async () => {
+    if (await browserRunning()) {
+      lastBrowserSeen = Date.now();
+      return;
+    }
+    if (Date.now() - lastBrowserSeen > BROWSER_GONE_EXIT_MS) {
+      log('浏览器已经关了一会儿，服务先下班（下次开浏览器会自动再起来）。');
       process.exit(0);
     }
   }, tickMs);
-  idleTimer.unref();
+  watchTimer.unref();
 }
 
 main().catch((error) => {

@@ -54,8 +54,9 @@ async function main() {
   const stopped = await shutdownService();
   console.log('  已通知 ' + stopped + ' 个正在运行的服务退出');
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1500);
+  killByCommandLine('wscript.exe', '启动收藏助手.vbs'); // 看门狗
   killByCommandLine('node.exe', path.join('src', 'server.js'));
-  console.log('  已确认后台没有残留');
+  console.log('  已结束看门狗和本机服务');
 
   REG_KEYS.forEach((key) => {
     spawnSync('reg', ['delete', key, '/f'], { stdio: 'ignore' });
@@ -74,7 +75,7 @@ async function main() {
   );
   if (fs.existsSync(legacyLink)) {
     fs.rmSync(legacyLink, { force: true });
-    console.log('  已删除旧版留下的开机启动项');
+    console.log('  已删除开机启动项（看门狗）');
   }
   const stopFile = path.join(ROOT, 'stop.txt');
   if (fs.existsSync(stopFile)) fs.rmSync(stopFile, { force: true });

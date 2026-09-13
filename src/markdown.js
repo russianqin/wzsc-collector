@@ -30,6 +30,18 @@ function getTurndown() {
       return text ? '**' + text + '**' : content;
     }
   });
+  // <br> 要当成"分段"。多数站点（知乎、公众号）作者按的是换行而不是分段，
+  // 默认的软换行写法会被很多渲染器（GitHub、编辑器预览）合并成一整段，
+  // 看起来就是"头几段糊成一大坨"。这里统一成空行，任何地方渲染都一致。
+  turndownInstance.addRule('lineBreakAsParagraph', {
+    filter: 'br',
+    replacement: (content, node) => {
+      const parent = node.parentNode ? node.parentNode.nodeName : '';
+      // 标题、表格、列表项里的换行不能变成空行，否则会把结构拆坏
+      if (/^(H1|H2|H3|H4|H5|H6|TD|TH|LI|DT|DD)$/.test(parent)) return ' ';
+      return '\n\n';
+    }
+  });
   return turndownInstance;
 }
 

@@ -17,7 +17,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { spawn, spawnSync } = require('child_process');
+const { spawn, spawnSync, execFileSync } = require('child_process');
 
 const ROOT = __dirname;
 const BIN = path.join(ROOT, 'bin');
@@ -25,6 +25,17 @@ const HOST_SRC = path.join(ROOT, 'tools', 'host.cs');
 const HOST_EXE = path.join(BIN, 'wzsc-host.exe');
 const HOST_NAME = 'com.wzsc.collector';
 const HOST_MANIFEST = path.join(BIN, HOST_NAME + '.json');
+const WATCHDOG = path.join(ROOT, '启动收藏助手.vbs');
+const STARTUP_LINK_VBS = path.join(ROOT, 'tools', 'startup-link.vbs');
+const STARTUP_LINK = path.join(
+  process.env.APPDATA || path.join(process.env.USERPROFILE || '.', 'AppData', 'Roaming'),
+  'Microsoft',
+  'Windows',
+  'Start Menu',
+  'Programs',
+  'Startup',
+  '收藏助手（随浏览器启动）.lnk'
+);
 // manifest.json 里的 key 决定了扩展 ID 是固定的，这里必须一致
 const EXTENSION_ID = 'blgbhlgdlgdfdhnfdnpabchipcdjbjkk';
 const CSC_CANDIDATES = [
@@ -88,11 +99,11 @@ async function main() {
   console.log('  文章收藏助手 · 一键安装（只做一次）');
   console.log('==============================================');
 
-  step(1, 6, '记下 Node 的位置');
+  step(1, 7, '记下 Node 的位置');
   fs.writeFileSync(path.join(ROOT, 'node-path.txt'), process.execPath, 'utf8');
   console.log('    ' + process.execPath);
 
-  step(2, 6, '检查配置文件 config.json');
+  step(2, 7, '检查配置文件 config.json');
   const configFile = path.join(ROOT, 'config.json');
   if (fs.existsSync(configFile)) {
     let repo = '(读不出来)';
@@ -125,7 +136,7 @@ async function main() {
     console.log('    （如果不对，用记事本改 config.json 里的 repoPath）');
   }
 
-  step(3, 6, '安装运行依赖（只有第一次需要，约 10 秒）');
+  step(3, 7, '安装运行依赖（只有第一次需要，约 10 秒）');
   // 用一整条命令（不传 args）可以避免 Node 关于 shell 的告警
   const npm = spawnSync('npm install --omit=dev --no-audit --no-fund', {
     cwd: ROOT,
@@ -134,7 +145,7 @@ async function main() {
   });
   if (npm.status !== 0) fail('依赖没装上。把上面的提示复制发我。');
 
-  step(4, 6, '编译小助手（bin\\wzsc-host.exe）');
+  step(4, 7, '编译小助手（bin\\wzsc-host.exe）');
   fs.mkdirSync(BIN, { recursive: true });
   const csc = CSC_CANDIDATES.find((candidate) => fs.existsSync(candidate));
   if (!csc) fail('没找到 Windows 自带的 csc.exe，编译不了小助手。');
@@ -148,7 +159,7 @@ async function main() {
   }
   console.log('    编译完成：' + HOST_EXE + '（' + fs.statSync(HOST_EXE).size + ' 字节）');
 
-  step(5, 6, '登记到浏览器（Edge / Chrome / Brave，只改当前用户）');
+  step(5, 7, '登记到浏览器（Edge / Chrome / Brave，只改当前用户）');
   fs.writeFileSync(
     HOST_MANIFEST,
     JSON.stringify(
@@ -180,7 +191,16 @@ async function main() {
     console.log('    已登记（扩展 ID：' + EXTENSION_ID + '）');
   }
 
-  step(6, 6, '试跑一次：让小助手把服务拉起来');
+  step(6, 7, '设置成"随浏览器自动启动"（开机启动 + 隐藏窗口）');
+  try {
+    execFileSync('cscript', ['//nologo', STARTUP_LINK_VBS, 'add', STARTUP_LINK, WATCHDOG], { stdio: 'inherit' });
+    spawn('wscript.exe', [WATCHDOG], { detached: true, stdio: 'ignore' }).unref();
+    console.log('    已加入开机启动，并立刻启动一次（看不到窗口是正常的）');
+  } catch (error) {
+    console.log('    设置开机启动失败（不影响手动使用）：' + error.message);
+  }
+
+  step(7, 7, '试跑一次：确认服务已经待命');
   const problem = await smokeTest();
   if (problem) {
     console.log('    没成功：' + problem);
@@ -195,7 +215,7 @@ async function main() {
   console.log('');
   console.log('平时怎么用：');
   console.log('  看到好文章 → 点浏览器右上角的扩展图标 → 保存这篇文章');
-  console.log('  （第一次点会多等一两秒，那是在叫醒服务）');
+  console.log('  （服务跟着浏览器待命，点开就能用，不用等）');
   console.log('');
   console.log('最后一步（只在第一次，必须做）：在浏览器里重新加载扩展');
   console.log('  1. Edge 打开 edge://extensions');
