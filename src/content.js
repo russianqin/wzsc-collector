@@ -56,7 +56,7 @@ async function collectPage(options) {
     } else if (site === 'weibo' && extractors.extractWeiboComments) {
       comments = extractors.extractWeiboComments();
     } else if (site === 'x' && extractors.extractXThread) {
-      comments = extractors.extractXThread({ author: entry.author });
+      comments = extractors.extractXThread({ author: entry.author, canonical: entry.canonical });
     }
   } catch (error) {
     console.warn('[wzsc] 评论提取出错（忽略）:', error);

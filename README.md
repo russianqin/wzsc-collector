@@ -69,6 +69,7 @@
 | 抓出来的排版/评论不对 | 在扩展里勾「同时保存调试页面」再存一次，项目里会出现 `debug/`，把快照发我 |
 | 自检 | `node src/server.js --check`（看仓库路径、版本、闲置时间、当前有没有服务在跑） |
 | 改过 `src/markdown.js` 的排版规则 | 跑 `npm test`：十几项纯 Node 检查，不联网、不用浏览器，一秒跑完 |
+| 改过 X 的抓取规则（`src/extractors.js` / `src/prepare-dom.js`） | 跑 `npm run test:browser`：用无头 Edge / Chrome 打开固定页面跑真实提取脚本；机器上没装浏览器会跳过 |
 
 ## 不想要了
 

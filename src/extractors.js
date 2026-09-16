@@ -378,7 +378,21 @@ function extractX() {
  */
 function extractXThread(options) {
   const wantedAuthor = (options && options.author ? String(options.author) : "").trim();
-  const articles = Array.from(document.querySelectorAll('article[data-testid="tweet"]'));
+  // 焦点推文自己也是一篇 article[data-testid="tweet"]。不排掉的话，它会被当成
+  // "作者发的第一条留言"，正文就会在留言区原样再出现一遍。
+  // 用 status 号认它：优先用正文链接（canonical），退而用当前页面地址。
+  const pageUrl = (options && options.canonical) || (typeof location !== "undefined" ? location.href : "");
+  const focalMatch = String(pageUrl).match(/\/status\/(\d+)/);
+  const focalStatusId = focalMatch ? focalMatch[1] : "";
+  const ownStatusId = (article) => {
+    const anchor = article.querySelector('a[href*="/status/"] time');
+    const link = anchor && anchor.closest("a");
+    const match = link ? String(link.getAttribute("href") || "").match(/\/status\/(\d+)/) : null;
+    return match ? match[1] : "";
+  };
+  const articles = Array.from(document.querySelectorAll('article[data-testid="tweet"]')).filter(
+    (article) => !focalStatusId || ownStatusId(article) !== focalStatusId
+  );
   const comments = [];
   articles.forEach((article) => {
     const nameEl = article.querySelector('[data-testid="User-Name"]');

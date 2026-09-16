@@ -7,7 +7,9 @@
   "scripts": {
     "start": "node src/server.js",
     "install-addon": "node install.js",
-    "test": "node tools/markdown-selftest.js"
+    "test": "node tools/markdown-selftest.js",
+    "test:browser": "node tools/browser-selftest.js",
+    "test:all": "npm test && npm run test:browser"
   },
   "dependencies": {
     "turndown": "^7.2.0",

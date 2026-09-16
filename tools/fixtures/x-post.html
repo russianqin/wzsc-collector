@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>X 普通帖（固定页面）</title>
+    <style>
+      /* X 的正文容器就是 pre-wrap：文本里的 \n 是真实换行，不是 HTML 空白 */
+      #tweetText { white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <article data-testid="tweet">
+      <div data-testid="User-Name"><span>Nagi Yan</span><span>@naki2012</span></div>
+      <a href="/naki2012/status/2061776400865243377"><time datetime="2026-06-02T11:46:14.000Z">2026年6月2日</time></a>
+      <div data-testid="tweetText" id="tweetText"></div>
+    </article>
+    <pre id="out">pending</pre>
+
+    <script>
+      const holder = document.getElementById('tweetText');
+      holder.appendChild(
+        document.createTextNode(
+          '《对于绝大部分人来说，AI对生活复杂度管理的帮助，要比工作大得多》\n\n锚点\n\nAI最大的价值，不是帮你干活，而是帮你管理复杂度。'
+        )
+      );
+      const bold = document.createElement('span');
+      bold.setAttribute('style', 'font-weight: 700');
+      bold.textContent = '加粗的一段\n折行';
+      holder.appendChild(bold);
+      const emoji = document.createElement('img');
+      emoji.setAttribute('src', 'https://abs.twimg.com/emoji/v2/72x72/1f600.png');
+      emoji.setAttribute('alt', 'smile');
+      holder.appendChild(emoji);
+    </script>
+    <script>
+      // 默认用仓库里的脚本；?extractors=<file url> 可以指定别的版本（对比改动前后）
+      const params = new URLSearchParams(location.search);
+      document.write(
+        '<script src="' + (params.get('extractors') || '../../src/extractors.js') + '"><\/script>'
+      );
+    </script>
+    <script>
+      try {
+        const entry = globalThis.WZSC_EXTRACTORS.extractX();
+        document.getElementById('out').textContent = JSON.stringify({
+          title: entry.title,
+          author: entry.author,
+          canonical: entry.canonical,
+          contentHtml: entry.contentHtml
+        });
+      } catch (error) {
+        document.getElementById('out').textContent = JSON.stringify({ error: String((error && error.message) || error) });
+      }
+    </script>
+  </body>
+</html>

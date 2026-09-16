@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>X 会话与评论（固定页面）</title>
+    <style>
+      div[data-testid="tweetText"] { white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <!-- 焦点推文：自己也是一篇 article，不应该被当成留言 -->
+    <article data-testid="tweet">
+      <div data-testid="User-Name"><span>Nagi Yan</span><span>@naki2012</span></div>
+      <a href="/naki2012/status/2061776400865243377"><time datetime="2026-06-02T11:46:14.000Z">2026年6月2日</time></a>
+      <div data-testid="tweetText">《对于绝大部分人来说，AI对生活复杂度管理的帮助，要比工作大得多》
+
+锚点
+
+AI最大的价值，不是帮你干活，而是帮你管理复杂度。</div>
+    </article>
+
+    <!-- 作者自己发的回复（status 号不同）：要留 -->
+    <article data-testid="tweet">
+      <div data-testid="User-Name"><span>Nagi Yan</span><span>@naki2012</span></div>
+      <a href="/naki2012/status/3000000000000000001"><time datetime="2026-06-02T12:00:00.000Z">2026年6月2日</time></a>
+      <div data-testid="tweetText">补充一句：这条留言是作者自己发的，要留下来。</div>
+    </article>
+
+    <!-- 长回复被折叠：DOM 里只有预览，点"显示更多"才换成全文 -->
+    <article data-testid="tweet">
+      <div data-testid="User-Name"><span>Susan STEM</span><span>@susan</span></div>
+      <a href="/susan/status/1111111111111111111"><time datetime="2026-06-01T10:00:00.000Z">2026年6月1日</time></a>
+      <div data-testid="tweetText" id="folded">AI接住生活的复杂度对我来说是最有价值的（test-time</div>
+      <div role="button" id="showMore">显示更多</div>
+    </article>
+
+    <pre id="out">pending</pre>
+
+    <script>
+      const FULL =
+        'AI接住生活的复杂度对我来说是最有价值的（test-time\n这里是被折叠起来的后半句，展开之后才在 DOM 里。';
+      const folded = document.getElementById('folded');
+      const button = document.getElementById('showMore');
+      button.addEventListener('click', () => {
+        button.remove();
+        folded.textContent = FULL;
+      });
+    </script>
+    <script>
+      // 默认用仓库里的脚本；?prepare= / ?extractors= 可以指定别的版本（对比改动前后）
+      const params = new URLSearchParams(location.search);
+      document.write(
+        '<script src="' + (params.get('prepare') || '../../src/prepare-dom.js') + '"><\/script>' +
+          '<script src="' + (params.get('extractors') || '../../src/extractors.js') + '"><\/script>'
+      );
+    </script>
+    <script>
+      (async () => {
+        try {
+          await globalThis.WZSC_PREPARE.x.comments();
+          const comments = globalThis.WZSC_EXTRACTORS.extractXThread({
+            author: 'Nagi Yan',
+            canonical: 'https://x.com/naki2012/status/2061776400865243377'
+          });
+          document.getElementById('out').textContent = JSON.stringify({
+            comments: comments.map((comment) => ({
+              nick: comment.nick,
+              author: comment.author,
+              text: comment.text
+            }))
+          });
+        } catch (error) {
+          document.getElementById('out').textContent = JSON.stringify({ error: String((error && error.message) || error) });
+        }
+      })();
+    </script>
+  </body>
+</html>
