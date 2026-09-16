@@ -27,7 +27,15 @@ function getTurndown() {
       node.nodeName === 'SPAN' && /font-weight:\s*(bold|[6-9]00)/i.test(node.getAttribute('style') || ''),
     replacement: (content) => {
       const text = content.trim();
-      return text ? '**' + text + '**' : content;
+      if (!text) return '';
+      // 加粗里夹了分段（**文字 空行 文字**）时逐段加粗：
+      // 否则 Markdown 里会渲染出字面的星号
+      return text
+        .split(/\n{2,}/)
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .map((part) => '**' + part + '**')
+        .join('\n\n');
     }
   });
   // <br> 要当成"分段"。多数站点（知乎、公众号）作者按的是换行而不是分段，
@@ -61,7 +69,10 @@ function htmlToMarkdown(html) {
     .replace(/^((?:#{1,6}[ \t]+)?\d+)\\\./gm, '$1.')
     // 微信的加粗常被 <br> 拆成两行（**文字\n**），这里合回去
     .replace(/\*\*([^*\n]{1,80})\n\*\*/g, '**$1**')
-    .replace(/\*\*\s*\n\s*\*\*/g, '')
+    // 清掉"只剩换行的空加粗"（** 单独一行、再空一行、又一个 **）。
+    // 这里必须限定 ** 自己占满整行：否则「加粗A + 空行 + 加粗B」会被当成空加粗，
+    // 两段被粘成一段（分段也就没了）。
+    .replace(/(^|\n)\*\*[ \t]*\n+[ \t]*\*\*(?=\n|$)/g, '$1')
     .replace(/\n{3,}/g, '\n\n')
     .replace(/[ \t]+$/gm, '')
     .trim();
@@ -159,11 +170,11 @@ function stripLeadingJunk(markdown, title) {
       /^(Views?|Article|Likes?|Reposts?)$/i.test(text) ||
       /^\]+\([^)]*analytics[^)]*\)$/.test(text) ||
       /^\[$/.test(text);
-    if (isJunk) {
-      lines.splice(index, 1);
-      continue;
-    }
-    index += 1;
+    // 碰到正文就收手：只清"正文之前"的杂项。
+    // （以前这里是继续往下扫，空行又被算作杂项，于是开头几十行里的分段空行
+    //   会被一并删掉，前几段就挤成一坨了。）
+    if (!isJunk) break;
+    lines.splice(index, 1);
   }
   return lines.join('\n').replace(/^\n+/, '');
 }

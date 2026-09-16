@@ -115,6 +115,24 @@
       await sleep(1500);
       if (!clicked && i >= 2) break;
     }
+    // X 会把长推文 / 长回复折叠成"显示更多"，折叠状态下 DOM 里只有一截预览文本，
+    // 回去读评论时就会从中间断掉。所以读之前先把页面上折叠的内容全部展开。
+    await expandFoldedTweets();
+  }
+
+  /** 点开所有"显示更多"：每轮重新查一次，直到页面上再没有可点的为止 */
+  async function expandFoldedTweets(rounds, perRound) {
+    const total = rounds || 4;
+    const each = perRound || 10;
+    for (let i = 0; i < total; i += 1) {
+      const clicked = clickByText(
+        'div[role="button"], button, span, a',
+        /^(Show more|显示更多|展开|展开全文|查看更多)$/,
+        each
+      );
+      if (!clicked) return;
+      await sleep(900);
+    }
   }
 
   const PREPARE_API = {

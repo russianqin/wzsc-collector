@@ -75,6 +75,17 @@ async function collectPage(options) {
     result.debugHtml = debugSnapshot.page;
     result.debugContentHtml = debugSnapshot.content;
   }
+  // 调试模式（X）：评论是滚动之后才渲染出来的，开头那份快照里通常没有它们。
+  // 这里补一份"评论加载完之后"的推文快照，评论被折叠 / 截断时才有据可查。
+  if (wantDebug && site === 'x') {
+    try {
+      result.debugTweetsHtml = Array.from(document.querySelectorAll('article[data-testid="tweet"]'))
+        .map((article) => article.outerHTML)
+        .join('\n<!-- tweet -->\n');
+    } catch (error) {
+      console.warn('[wzsc] 推文快照出错（忽略）:', error);
+    }
+  }
   return result;
 }
 

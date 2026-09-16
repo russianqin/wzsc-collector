@@ -315,8 +315,30 @@ function extractX() {
     document.querySelector('[data-testid="cellInnerDiv"] article') ||
     document;
 
+  // X 的正文是 white-space: pre-wrap 渲染的，换行是文本里的 "\n"，不是 <br>。
+  // 直接把 innerHTML 交给 Markdown 时，这些换行会被当成"HTML 里的空白"并成一个空格，
+  // 整篇就挤成一坨了。这里先把文本节点里的换行换成 <br>，
+  // 后面统一走既有的"换行 = 分段"规则，和公众号 / 知乎的表现保持一致。
+  const withLineBreaks = (el) => {
+    const clone = el.cloneNode(true);
+    const walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT, null);
+    const textNodes = [];
+    while (walker.nextNode()) textNodes.push(walker.currentNode);
+    textNodes.forEach((node) => {
+      const value = node.nodeValue || '';
+      if (value.indexOf('\n') === -1) return;
+      const fragment = document.createDocumentFragment();
+      value.split(/\r?\n/).forEach((part, index) => {
+        if (index > 0) fragment.appendChild(document.createElement('br'));
+        if (part) fragment.appendChild(document.createTextNode(part));
+      });
+      node.parentNode.replaceChild(fragment, node);
+    });
+    return clone.innerHTML;
+  };
+
   const textEls = Array.from(scope.querySelectorAll('[data-testid="tweetText"]'));
-  let contentHtml = textEls.map((el) => el.innerHTML).join('<hr>');
+  let contentHtml = textEls.map((el) => withLineBreaks(el)).join('<hr>');
   if (!contentHtml) {
     const fallback = meta('og:description') || meta('twitter:description');
     if (fallback) contentHtml = '<p>' + fallback + '</p>';

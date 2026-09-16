@@ -34,7 +34,7 @@ const { log, sanitizeFilename, nextSerial, guessExt } = require('./util');
 const BASE_PORT = Number(process.env.WZSC_PORT || 8765);
 const MAX_PORT_TRIES = 4;
 // 服务版本：扩展会检查它，太旧的服务会被跳过（避免连到别的东西上）
-const SERVICE_VERSION = '0.3.0';
+const SERVICE_VERSION = '0.3.1';
 const MAX_BODY = 30 * 1024 * 1024; // 30MB
 const config = loadConfig();
 
@@ -121,6 +121,11 @@ async function saveArticle(payload) {
       if (payload.debugContentHtml) {
         const contentFile = path.join(debugDir, `${payload.siteId || 'page'}-content-${Date.now()}.html`);
         fs.writeFileSync(contentFile, payload.debugContentHtml, 'utf8');
+      }
+      if (payload.debugTweetsHtml) {
+        const tweetsFile = path.join(debugDir, `${payload.siteId || 'page'}-tweets-${Date.now()}.html`);
+        fs.writeFileSync(tweetsFile, payload.debugTweetsHtml, 'utf8');
+        log(`已保存推文快照：${tweetsFile}`);
       }
     } catch (error) {
       log('保存调试页面失败：' + error.message);
