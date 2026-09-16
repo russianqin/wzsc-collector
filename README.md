@@ -18,7 +18,8 @@
 看门狗挂在开机启动里，所以开机后照常开浏览器就行；
 小助手走的是 Chrome / Edge 官方的**原生消息（Native Messaging）**通道——
 这是浏览器唯一允许扩展启动本机程序的方式。安装时会在
-`HKEY_CURRENT_USER\Software\Microsoft\Edge\NativeMessagingHosts\` 等位置登记一条记录（只改当前用户）。
+`HKEY_CURRENT_USER\Software\Microsoft\Edge\NativeMessagingHosts\` 等位置各登记一条记录
+（Edge / Chrome / Brave 各一条，只改当前用户，随时可删）。
 
 登录状态用的是**你自己浏览器**的登录态，所以知乎评论、微博、X 回复都能正常拿到，
 不需要额外登录什么。
@@ -50,13 +51,17 @@
 | --- | --- | --- |
 | `repoPath` | 收藏仓库文件夹（md 写到这里） | 桌面 `WenZhangShouCang` |
 | `images` | `keep-remote` 只保留图片外链（仓库最小）/ `download` 把图片下载进仓库 | `keep-remote` |
-| `includeComments` | 是否采集评论 | `true` |
-| `commentFilter` | `author` 只留精选和与作者有互动的 / `all` 全留 / `none` 不留 | `author` |
+| `includeComments` | 预留字段，目前还没接进服务（改它不会影响结果） | `true` |
+| `commentFilter` | `author` 先留作者参与的（判据是"带 (作者) 标记"或"有点赞数"，所以多数情况等于全留）/ `all` 全留 / `none` 不留 | `author` |
 | `video` | `poster` 只存封面图 + 视频地址 / `none` 不存 | `poster` |
 | `maxComments` | 每篇最多保留多少条评论 | `50` |
 | `assetsDirName` | 下载图片时的目录名（`keep-remote` 时用不到） | `assets` |
 
-想让服务多待一会儿（默认闲置 5 分钟退出），可以在启动前设环境变量 `WZSC_IDLE_MS`。
+`repoPath` 漏写时会退到当前目录；安装时自动生成的那份默认指向桌面 `WenZhangShouCang`。
+
+服务默认在浏览器全关 **3 分钟**后退出。想让它多待一会儿，用环境变量 `WZSC_BROWSER_IDLE_MS`（毫秒，默认 `180000`）。
+服务是被看门狗 / 扩展拉起来的，所以这个变量要生效，得设成用户环境变量（重新登录后由看门狗继承），
+或者在自己手动起服务之前设置。
 
 ## 出问题了
 
@@ -66,9 +71,9 @@
 | 想看看门狗在干什么 | 打开 `debug\watchdog.log`（每次它检查/启动服务都会记一行） |
 | 杀毒软件询问 `bin\wzsc-host.exe` | 允许即可，它就是这个 7 KB 的启动小助手 |
 | 把项目文件夹改名或移动了 | 重新双击 `1-一键安装.cmd`（登记的路径要跟着更新） |
-| 抓出来的排版/评论不对 | 在扩展里勾「同时保存调试页面」再存一次，项目里会出现 `debug/`，把快照发我 |
-| 自检 | `node src/server.js --check`（看仓库路径、版本、闲置时间、当前有没有服务在跑） |
-| 改过 `src/markdown.js` 的排版规则 | 跑 `npm test`：十几项纯 Node 检查，不联网、不用浏览器，一秒跑完 |
+| 抓出来的排版/评论不对 | 在扩展里勾「同时保存调试页面」再存一次，项目里会出现 `debug/`；那是**页面原始 HTML**，可能带你登录态下才看得见的内容，分享或提交前先自己看一眼 |
+| 自检 | `node src/server.js --check`（看仓库路径、服务版本、图片设置、浏览器在不在跑、当前有没有服务在跑） |
+| 改过 `src/markdown.js` 的排版规则 | 跑 `npm test`：22 项纯 Node 检查，不联网、不用浏览器，一秒跑完 |
 | 改过 X 的抓取规则（`src/extractors.js` / `src/prepare-dom.js`） | 跑 `npm run test:browser`：用无头 Edge / Chrome 打开固定页面跑真实提取脚本；机器上没装浏览器会跳过 |
 
 ## 不想要了
@@ -79,9 +84,12 @@
 ## 隐私与安全
 
 - 采集到的东西只写进**你自己的**收藏仓库文件夹，不上传任何地方。
-- 登录态在你自己浏览器的配置里，本项目里没有任何账号信息。
-- 只登记当前用户（HKCU）的一条原生消息记录，随时可以删。
-- `.gitignore` 已排除 `config.json`、`debug/`、`node_modules/`、`bin/`、`node-path.txt`。
+- 登录态在你自己浏览器的配置里，本项目里没有任何账号信息；扩展只访问 `127.0.0.1` 上的本机服务。
+- 原生消息记录只写当前用户（HKCU），Edge / Chrome / Brave 各一条，随时可以删（`2-取消安装.cmd` 会一起清掉）。
+- `.gitignore` 已排除 `config.json`、`debug/`、`node_modules/`、`bin/`、`node-path.txt`——这些都可能带上本机信息，
+  别手动加进 git。
+- 打开「同时保存调试页面」后存在 `debug/` 里的 `*.html` 是**页面原始快照**，可能包含只有登录后才看得到的内容；
+  要分享给别人之前，先自己看一遍（或只挑需要的片段）。
 
 ## License
 
