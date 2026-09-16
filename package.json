@@ -6,7 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "start": "node src/server.js",
-    "install-addon": "node install.js"
+    "install-addon": "node install.js",
+    "test": "node tools/markdown-selftest.js"
   },
   "dependencies": {
     "turndown": "^7.2.0",
