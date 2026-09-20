@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>知乎评论（固定页面）</title>
+    <style>
+      .CommentItem { margin-left: 0; }
+      .CommentItem .CommentItem { margin-left: 32px; } /* 回复是嵌在父评论里面的 */
+    </style>
+  </head>
+  <body>
+    <!--
+      模拟知乎：页面上 6 条评论，其中 2 条是作者对别人评论的回复。
+      知乎把回复渲染在父评论的容器里，所以这里也这么摆。
+    -->
+    <div class="CommentListV2">
+      <div class="CommentItem">
+        <div class="CommentItem-head">
+          <a href="/people/lurenjia"><img class="Avatar" src="https://picx.zhimg.com/avatar-a.jpg" alt="路人甲" /></a>
+          <a href="/people/lurenjia">路人甲</a>
+          <button>3</button>
+          <button>回复</button>
+        </div>
+        <div class="CommentContent">路人甲说的话：这办法对中年人也管用吗？</div>
+      </div>
+
+      <div class="CommentItem">
+        <div class="CommentItem-head">
+          <a href="/people/lurenyi"><img class="Avatar" src="https://picx.zhimg.com/avatar-b.jpg" alt="路人乙" /></a>
+          <a href="/people/lurenyi">路人乙</a>
+          <button>回复</button>
+        </div>
+        <div class="CommentContent">路人乙说的话：约饭那一段我不太同意。</div>
+
+        <!-- 作者回复了路人乙：应该挂在这条评论下面，而不是自己单开一条 -->
+        <div class="CommentItem">
+          <div class="CommentItem-head">
+            <a href="/people/yiwangtong"><img class="Avatar" src="https://picx.zhimg.com/avatar-author.jpg" alt="一望瞳" /></a>
+            <a href="/people/yiwangtong">一望瞳</a>
+            <span>作者</span>
+            <button>回复</button>
+          </div>
+          <div class="CommentContent">回复 @路人乙：约饭只是最低成本的一次筛选。</div>
+        </div>
+      </div>
+
+      <div class="CommentItem">
+        <div class="CommentItem-head">
+          <a href="/people/lurenbing"><img class="Avatar" src="https://picx.zhimg.com/avatar-c.jpg" alt="路人丙" /></a>
+          <a href="/people/lurenbing">路人丙</a>
+          <button>12</button>
+          <button>回复</button>
+        </div>
+        <div class="CommentContent">路人丙说的话：五星级酒店那招是真有用。</div>
+
+        <div class="CommentItem">
+          <div class="CommentItem-head">
+            <a href="/people/yiwangtong"><img class="Avatar" src="https://picx.zhimg.com/avatar-author.jpg" alt="一望瞳" /></a>
+            <a href="/people/yiwangtong">一望瞳</a>
+            <span>作者</span>
+            <button>回复</button>
+          </div>
+          <div class="CommentContent">回复 @路人丙：借势而已，别想歪。</div>
+        </div>
+      </div>
+
+      <div class="CommentItem">
+        <div class="CommentItem-head">
+          <a href="/people/lurending"><img class="Avatar" src="https://picx.zhimg.com/avatar-d.jpg" alt="路人丁" /></a>
+          <a href="/people/lurending">路人丁</a>
+          <button>回复</button>
+        </div>
+        <div class="CommentContent">路人丁说的话：最后一段太真实了。</div>
+      </div>
+    </div>
+
+    <pre id="out">pending</pre>
+
+    <script>
+      const params = new URLSearchParams(location.search);
+      document.write('<script src="' + (params.get('extractors') || '../../src/extractors.js') + '"><\/script>');
+    </script>
+    <script>
+      try {
+        const comments = globalThis.WZSC_EXTRACTORS.extractZhihuComments({});
+        document.getElementById('out').textContent = JSON.stringify({ comments: comments });
+      } catch (error) {
+        document.getElementById('out').textContent = JSON.stringify({ error: String((error && error.message) || error) });
+      }
+    </script>
+  </body>
+</html>

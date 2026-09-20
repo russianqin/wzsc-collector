@@ -108,23 +108,39 @@ function extractZhihu() {
 /**
  * 知乎评论：知乎用哈希类名（css-xxxxx），所以这里按结构找——
  * 每一条评论都自带 .CommentContent，向上找最近的"包含头像的容器"就是这条评论。
+ * 回复是渲染在父评论里面的，所以再用"谁的容器包着谁"把回复挂回它所属的那条评论，
+ * 这样留言区是一条条完整的对话（评论 + 下面的回复），而不是把回复拍平成独立评论。
  */
 function extractZhihuComments() {
-  const comments = [];
-  Array.from(document.querySelectorAll('.CommentContent')).forEach((contentEl) => {
+  const entries = Array.from(document.querySelectorAll('.CommentContent')).map((contentEl) => {
     let item = contentEl;
     while (item && item !== document.body && !item.querySelector('img.Avatar')) {
       item = item.parentElement;
     }
     if (!item || item === document.body) item = contentEl.parentElement || contentEl;
+    return { contentEl: contentEl, item: item };
+  });
+
+  /** 读一条评论自己的信息（头像 / 昵称 / 赞数 / (作者) 标记 / 正文） */
+  function readComment(entry) {
+    const item = entry.item;
+    const contentEl = entry.contentEl;
+    // 嵌在这条评论下面的回复：它们的信息不属于这条评论
+    const nested = entries
+      .filter((other) => other.item !== item && item.contains(other.item))
+      .map((other) => other.item);
+    const isOwn = (el) => !nested.some((node) => node.contains(el));
 
     const avatarEl = item.querySelector('img.Avatar');
-    const nickLink = Array.from(item.querySelectorAll('a[href*="/people/"]')).find((a) => (a.innerText || '').trim());
+    const nickLink = Array.from(item.querySelectorAll('a[href*="/people/"]')).find(
+      (a) => (a.innerText || '').trim() && isOwn(a)
+    );
     const nick = nickLink ? nickLink.innerText.trim() : avatarEl ? avatarEl.getAttribute('alt') || '' : '';
 
     // 点赞数：动作行里那个"纯数字"的按钮（比如 1923）
     let likes = '';
     Array.from(item.querySelectorAll('button')).some((button) => {
+      if (!isOwn(button)) return false;
       const match = (button.innerText || '').trim().match(/^(\d+)$/);
       if (match) {
         likes = match[1];
@@ -135,19 +151,51 @@ function extractZhihuComments() {
 
     // 「作者」标记：昵称旁边那个独立的小标签（排除正文里出现的"作者"二字）
     const author = Array.from(item.querySelectorAll('div, span')).some(
-      (el) => (el.innerText || '').trim() === '作者' && !contentEl.contains(el)
+      (el) => isOwn(el) && (el.innerText || '').trim() === '作者' && !contentEl.contains(el)
     );
 
-    comments.push({
+    return {
       avatar: avatarEl ? avatarEl.getAttribute('src') || '' : '',
       nick: nick,
       likes: likes,
       text: (contentEl.innerText || '').trim(),
       author: author,
       replies: []
+    };
+  }
+
+  const byEntry = new Map();
+  entries.forEach((entry) => byEntry.set(entry, readComment(entry)));
+
+  /** 最近的那个"包着自己的"条目 = 它回复的对象；没有就是顶层评论 */
+  function parentEntryOf(entry) {
+    let found = null;
+    byEntry.forEach((comment, other) => {
+      if (other.item === entry.item || !other.item.contains(entry.item)) return;
+      if (!found || found.item.contains(other.item)) found = other;
     });
+    return found;
+  }
+
+  /** 知乎的回复可以套好几层，这里统一挂到最外层那条评论下面，只留一层 */
+  function rootEntryOf(entry) {
+    let root = entry;
+    let current = parentEntryOf(entry);
+    while (current) {
+      root = current;
+      current = parentEntryOf(current);
+    }
+    return root;
+  }
+
+  const comments = [];
+  entries.forEach((entry) => {
+    const root = rootEntryOf(entry);
+    if (root === entry) comments.push(byEntry.get(entry));
+    else byEntry.get(root).replies.push(byEntry.get(entry));
   });
-  return comments.filter((comment) => comment.text);
+
+  return comments.filter((comment) => comment.text || comment.replies.length > 0);
 }
 
 /* ---------------------------------------------------------------- 新浪微博 */

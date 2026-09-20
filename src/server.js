@@ -68,14 +68,44 @@ async function downloadImage(url, destDir, index) {
   }
 }
 
-/** 只保留"精选"或"与作者有互动"的评论；都分不清时就退回前 N 条 */
+/** 一条对话占几条（评论本身 + 它下面的回复） */
+function threadSize(comment) {
+  return 1 + (((comment && comment.replies) || []).length);
+}
+
+/** 这条对话值不值得留：作者参与过（作者本人的评论，或作者在回复里），或者有点赞 */
+function threadIsCurated(comment) {
+  if (comment.author || comment.likes) return true;
+  return ((comment.replies || []).some((reply) => reply.author || reply.likes));
+}
+
+/**
+ * 决定一篇里最后留下哪些评论。
+ *   none   ：不留
+ *   all    ：全留
+ *   author ：整篇不超过 maxComments 时**全留**——这种时候"挑精选"没有意义，
+ *            筛掉一半只会让留言区没头没尾（只剩作者自己的回复，别人说的话全没了）。
+ *            超过上限才挑，而且是按**整条对话**挑：作者跟别人来回的那一段，连同
+ *            对方说的话一起留下，不会只留下作者那一句。
+ */
 function filterComments(comments, conf) {
   if (!comments || comments.length === 0) return [];
   if (conf.commentFilter === 'none') return [];
-  if (conf.commentFilter === 'all') return comments.slice(0, conf.maxComments);
-  const curated = comments.filter((comment) => comment.author || comment.likes);
-  if (curated.length > 0) return curated.slice(0, conf.maxComments);
-  return comments.slice(0, Math.min(10, conf.maxComments));
+  const limit = Math.max(1, Number(conf.maxComments) || 50);
+  const total = comments.reduce((sum, comment) => sum + threadSize(comment), 0);
+  if (conf.commentFilter === 'all' || total <= limit) return comments;
+
+  const kept = [];
+  let used = 0;
+  for (const comment of comments) {
+    if (!threadIsCurated(comment)) continue;
+    // 整条装不下就停手：宁可少留一条对话，也不把它拆成半截
+    if (used > 0 && used + threadSize(comment) > limit) break;
+    kept.push(comment);
+    used += threadSize(comment);
+  }
+  if (kept.length > 0) return kept;
+  return comments.slice(0, Math.min(10, limit));
 }
 
 async function saveArticle(payload) {
@@ -126,6 +156,11 @@ async function saveArticle(payload) {
         const tweetsFile = path.join(debugDir, `${payload.siteId || 'page'}-tweets-${Date.now()}.html`);
         fs.writeFileSync(tweetsFile, payload.debugTweetsHtml, 'utf8');
         log(`已保存推文快照：${tweetsFile}`);
+      }
+      if (payload.debugCommentsHtml) {
+        const commentsFile = path.join(debugDir, `${payload.siteId || 'page'}-comments-${Date.now()}.html`);
+        fs.writeFileSync(commentsFile, payload.debugCommentsHtml, 'utf8');
+        log(`已保存评论区快照：${commentsFile}`);
       }
     } catch (error) {
       log('保存调试页面失败：' + error.message);

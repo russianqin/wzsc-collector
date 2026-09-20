@@ -52,9 +52,9 @@
 | `repoPath` | 收藏仓库文件夹（md 写到这里） | 桌面 `WenZhangShouCang` |
 | `images` | `keep-remote` 只保留图片外链（仓库最小）/ `download` 把图片下载进仓库 | `keep-remote` |
 | `includeComments` | 预留字段，目前还没接进服务（改它不会影响结果） | `true` |
-| `commentFilter` | `author` 先留作者参与的（判据是"带 (作者) 标记"或"有点赞数"，所以多数情况等于全留）/ `all` 全留 / `none` 不留 | `author` |
+| `commentFilter` | `author` 整篇没超过 `maxComments` 时**全留**；超过了才挑，而且是按**整条对话**挑（作者参与的对话，连同对方说的话、下面的回复一起留）/ `all` 全留 / `none` 不留 | `author` |
 | `video` | `poster` 只存封面图 + 视频地址 / `none` 不存 | `poster` |
-| `maxComments` | 每篇最多保留多少条评论 | `50` |
+| `maxComments` | 每篇最多保留多少条评论（含回复） | `50` |
 | `assetsDirName` | 下载图片时的目录名（`keep-remote` 时用不到） | `assets` |
 
 `repoPath` 漏写时会退到当前目录；安装时自动生成的那份默认指向桌面 `WenZhangShouCang`。

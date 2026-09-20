@@ -86,6 +86,22 @@ async function collectPage(options) {
       console.warn('[wzsc] 推文快照出错（忽略）:', error);
     }
   }
+  // 调试模式（知乎）：评论同样是滚动之后才渲染出来的，开头那份快照里没有它们。
+  // 这里单独留一份"评论区"的快照，评论分组（谁回复谁）出问题时才有据可查。
+  if (wantDebug && site === 'zhihu') {
+    try {
+      const nodes = Array.from(document.querySelectorAll('.CommentContent'));
+      if (nodes.length > 0) {
+        let box = nodes[0];
+        while (box && box !== document.body && !nodes.every((node) => box.contains(node))) {
+          box = box.parentElement;
+        }
+        if (box && box !== document.body) result.debugCommentsHtml = box.outerHTML;
+      }
+    } catch (error) {
+      console.warn('[wzsc] 评论区快照出错（忽略）:', error);
+    }
+  }
   return result;
 }
 
