@@ -9,6 +9,18 @@
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  /**
+   * 按钮文字归一化：去掉零宽字符、压平空白。
+   * 知乎的"61 条评论"前面常夹一个不可见的 U+200B，
+   * 不处理的话 /^\d+\s*条评论$/ 这种匹配会全部落空。
+   */
+  function normalizeLabel(text) {
+    return String(text || '')
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   async function autoScroll(rounds) {
     for (let i = 0; i < rounds; i += 1) {
       window.scrollBy(0, Math.round(window.innerHeight * 0.9));
@@ -22,7 +34,7 @@
     let clicked = 0;
     for (const node of Array.from(document.querySelectorAll(selector))) {
       if (clicked >= max) break;
-      if (pattern.test((node.innerText || '').trim()) && node.click) {
+      if (pattern.test(normalizeLabel(node.innerText)) && node.click) {
         node.click();
         clicked += 1;
       }
@@ -76,20 +88,78 @@
   /* ---------------- 阶段二：加载评论 ---------------- */
 
   async function commentsZhihu() {
-    const target = findZhihuCard() || document.querySelector('.ContentItem.AnswerItem, .AnswerCard');
-    if (target) {
-      const button = Array.from(target.querySelectorAll('button')).find((el) => /评论/.test(el.innerText || ''));
-      if (button) button.click();
-      await sleep(2500);
+    const card = findZhihuCard() || document.querySelector('.ContentItem.AnswerItem, .AnswerCard');
+
+    // 评论面板有时是默认收起的。先在页面里等一会儿看有没有已经渲染出来的评论，
+    // 没有再去点"打开评论"的入口——不能一上来就盲点，本来开着反而会被点关。
+    if (!(await waitForZhihuComments(1500))) {
+      const trigger = findZhihuCommentTrigger(card);
+      if (trigger) trigger.click();
+      if (!(await waitForZhihuComments(5000)) && card) {
+        // 还没出来：把回答底部滚进视野再试一次（评论区一般就挂在回答下面）
+        card.scrollIntoView({ block: 'end' });
+        await sleep(800);
+        const retry = findZhihuCommentTrigger(card);
+        if (retry) retry.click();
+        await waitForZhihuComments(5000);
+      }
     }
+
+    // 评论区里"展开回复 / 查看更多"之类的按钮
     for (let i = 0; i < 3; i += 1) {
       if (!clickByText('button', /查看全部\s*\d*\s*条回复|展开.*回复/)) break;
-      await sleep(1500);
+      await sleep(1200);
     }
     for (let i = 0; i < 3; i += 1) {
       if (!clickByText('button, a, span', /更多评论|加载更多|查看全部评论|展开更多/)) break;
-      await sleep(1500);
+      await sleep(1200);
     }
+  }
+
+  /** 评论区渲染出来没有（返回目前的评论条数） */
+  function zhihuCommentCount() {
+    return document.querySelectorAll('.CommentContent').length;
+  }
+
+  /** 等评论区出现，最多等 ms 毫秒 */
+  async function waitForZhihuComments(ms) {
+    const deadline = Date.now() + ms;
+    while (Date.now() < deadline) {
+      if (zhihuCommentCount() > 0) return true;
+      await sleep(300);
+    }
+    return zhihuCommentCount() > 0;
+  }
+
+  /**
+   * 找"打开评论"的入口：先在回答卡片里找，找不到再在整页找。
+   * 知乎不同版本、不同入口（问题页 / 回答页 / 浮动面板）长得不一样，
+   * 这里只认"像评论数"的文字，避免点到别的东西。
+   */
+  function findZhihuCommentTrigger(card) {
+    const score = (el) => {
+      const text = normalizeLabel(el.innerText || el.getAttribute('aria-label') || el.getAttribute('title') || '');
+      if (!text || text.length > 20) return 0;
+      if (/^查看全部\s*\d*\s*条评论$/.test(text)) return 5;
+      if (/^\d+\s*条评论$/.test(text)) return 4;
+      if (/^评论\s*\d+$/.test(text)) return 3;
+      if (text === '评论' || text === '添加评论') return 2;
+      return 0;
+    };
+    const pick = (root) => {
+      if (!root || !root.querySelectorAll) return null;
+      let best = null;
+      let bestScore = 0;
+      Array.from(root.querySelectorAll('button, a, [role="button"]')).forEach((el) => {
+        const value = score(el);
+        if (value > bestScore) {
+          best = el;
+          bestScore = value;
+        }
+      });
+      return best;
+    };
+    return pick(card) || pick(document);
   }
 
   async function commentsWeibo() {

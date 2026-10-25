@@ -90,6 +90,20 @@ async function collectPage(options) {
   // 这里单独留一份"评论区"的快照，评论分组（谁回复谁）出问题时才有据可查。
   if (wantDebug && site === 'zhihu') {
     try {
+      result.debugCommentCount = document.querySelectorAll('.CommentContent').length;
+      // 没有评论时，把页面里"像评论入口"的元素记下来，
+      // 这样能看清是没点开、还是结构变了，而不是只看到一个 0。
+      result.debugCommentCandidates = Array.from(
+        document.querySelectorAll('button, a, [role="button"]')
+      )
+        .map((el) => ({
+          tag: el.tagName.toLowerCase(),
+          text: (el.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 40),
+          aria: el.getAttribute('aria-label') || '',
+          cls: String(el.className || '').slice(0, 60)
+        }))
+        .filter((item) => /评论|回复|comment/i.test(item.text + ' ' + item.aria + ' ' + item.cls))
+        .slice(0, 40);
       const nodes = Array.from(document.querySelectorAll('.CommentContent'));
       if (nodes.length > 0) {
         let box = nodes[0];

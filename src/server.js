@@ -162,6 +162,22 @@ async function saveArticle(payload) {
         fs.writeFileSync(commentsFile, payload.debugCommentsHtml, 'utf8');
         log(`已保存评论区快照：${commentsFile}`);
       }
+      if (payload.debugCommentCandidates) {
+        const candidatesFile = path.join(debugDir, `${payload.siteId || 'page'}-comment-candidates-${Date.now()}.json`);
+        fs.writeFileSync(
+          candidatesFile,
+          JSON.stringify(
+            {
+              commentCount: payload.debugCommentCount,
+              candidates: payload.debugCommentCandidates
+            },
+            null,
+            2
+          ),
+          'utf8'
+        );
+        log(`已保存评论入口清单：${candidatesFile}`);
+      }
     } catch (error) {
       log('保存调试页面失败：' + error.message);
     }
